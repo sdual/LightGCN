@@ -21,4 +21,5 @@ def test_init_adj_matrix():
         ],
         dtype=np.float32,
     )
+    print(type(actual))
     np.testing.assert_array_equal(actual.toarray(), expected)

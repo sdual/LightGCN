@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import torch.nn as nn
-from scipy.sparse import diags, dok_matrix
+from scipy.sparse import csr_matrix, diags, dok_matrix
 
 from lightgcn.embedding import EmbeddingInitializer
 
@@ -17,7 +17,9 @@ _take_power_1over2_if_non_zero_func = np.frompyfunc(_take_power_1over2_if_non_ze
 
 
 # This method creates D^{-1/2} A D^{-1/2} in the article https://arxiv.org/abs/2002.02126
-def init_adj_matrix(num_users: int, num_items: int, user_id_idx: pd.Series, item_id_idx: pd.Series):
+def init_adj_matrix(
+    num_users: int, num_items: int, user_id_idx: pd.Series, item_id_idx: pd.Series
+) -> csr_matrix:
     rating_matrix = dok_matrix((num_users, num_items), dtype=np.float32)
     rating_matrix[user_id_idx, item_id_idx] = 1.0
 

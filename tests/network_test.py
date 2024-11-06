@@ -10,6 +10,7 @@ def test_init_adj_matrix():
     item_id_idx = np.array([0, 1, 2])
     actual = init_adj_matrix(num_users, num_items, user_id_idx, item_id_idx)
 
+    # The expected matrix is D^{-1/2} A D^{-1/2} in the article https://arxiv.org/abs/2002.02126
     expected = np.array(
         [
             [0.0, 0.0, 0.0, 0.0, 1.0],

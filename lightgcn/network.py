@@ -18,7 +18,7 @@ _take_power_1over2_if_non_zero_func = np.frompyfunc(_take_power_1over2_if_non_ze
 
 # This method creates D^{-1/2} A D^{-1/2} in the article https://arxiv.org/abs/2002.02126
 def init_adj_matrix(
-    num_users: int, num_items: int, user_id_idx: pd.Series, item_id_idx: pd.Series
+    num_users: int, num_items: int, user_id_idx: np.ndarray, item_id_idx: np.ndarray
 ) -> csr_matrix:
     rating_matrix = dok_matrix((num_users, num_items), dtype=np.float32)
     rating_matrix[user_id_idx, item_id_idx] = 1.0

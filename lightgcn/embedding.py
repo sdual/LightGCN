@@ -3,7 +3,7 @@ from typing import Protocol
 import torch.nn as nn
 
 
-class EmbeddingInitializer(Protocol):
+class EmbeddingLayer(Protocol):
     def init_embedding(self) -> nn.Embedding: ...
 
     def num_users(self) -> int: ...
@@ -11,7 +11,7 @@ class EmbeddingInitializer(Protocol):
     def num_items(self) -> int: ...
 
 
-class XavierUniformInitializer:
+class XavierUniformEmbedding:
     def __init__(self, num_users: int, num_items: int, vector_dim: int):
         self._num_users: int = num_users
         self._num_items: int = num_items

@@ -2,7 +2,7 @@ import numpy as np
 import torch.nn as nn
 from scipy.sparse import csr_matrix, diags, dok_matrix
 
-from lightgcn.embedding import EmbeddingLayer
+from lightgcn.embedding import EmbeddingLayer, InitDist
 
 
 def _take_power_1over2_if_non_zero(value: np.float32) -> np.float32:
@@ -42,10 +42,18 @@ def init_adj_matrix(
 
 
 class LightGCN(nn.Module):
-    def __init__(self, embed_initializer: EmbeddingLayer, user_item_idx: np.ndarray):
+    def __init__(
+        self,
+        num_users: int,
+        num_items: int,
+        vec_dim: int,
+        init_dist: InitDist,
+        user_item_idx: np.ndarray,
+    ):
+        embed_initializer = EmbeddingLayer(num_users, num_items, vec_dim, init_dist)
         self._embed: nn.Embedding = embed_initializer.init_embedding()
-        self._num_users: int = embed_initializer.num_users()
-        self._num_items: int = embed_initializer.num_items()
+        self._num_users: int = num_users
+        self._num_items: int = num_items
 
     def forward(self):
         pass

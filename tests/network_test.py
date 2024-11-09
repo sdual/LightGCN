@@ -1,6 +1,8 @@
 import numpy as np
+import torch
 
-from lightgcn.network import init_adj_matrix
+from lightgcn.embedding import InitDist
+from lightgcn.network import LightGCN, init_adj_matrix
 
 
 def test_init_adj_matrix():
@@ -22,3 +24,16 @@ def test_init_adj_matrix():
         dtype=np.float32,
     )
     np.testing.assert_array_equal(actual.toarray(), expected)
+
+
+class TestLightGCN:
+    def test_forward(self):
+        num_users = 2
+        num_items = 3
+        vec_dim = 10
+        num_layers = 3
+        init_dist = InitDist.XAVIER_UNIFORM
+
+        model = LightGCN(num_users, num_items, vec_dim, num_layers, init_dist)
+        actual = model(torch.Tensor([0, 1]))
+        print(actual)

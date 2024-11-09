@@ -1,4 +1,6 @@
 import numpy as np
+import pandas as pd
+import torch
 import torch.nn as nn
 from scipy.sparse import csr_matrix, diags, dok_matrix
 
@@ -47,13 +49,25 @@ class LightGCN(nn.Module):
         num_users: int,
         num_items: int,
         vec_dim: int,
+        num_layers: int,
         init_dist: InitDist,
-        user_item_idx: np.ndarray,
     ):
+        super(LightGCN, self).__init__()
         embed_initializer = EmbeddingLayer(num_users, num_items, vec_dim, init_dist)
         self._embed: nn.Embedding = embed_initializer.init_embedding()
         self._num_users: int = num_users
         self._num_items: int = num_items
+        self._norm_adj: csr_matrix = init_adj_matrix(num_items, num_items)
+        self._num_layers: int = num_layers
 
-    def forward(self):
-        pass
+    def forward(self, user_idxs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        embed_weights = self._embed.weight
+        all_layer_embed_list = [self._embed.weight] + [
+            torch.sparse.mm(self._norm_adj, embed_weights) for _ in range(self._num_layers)
+        ]
+        all_embed_tensor = torch.stack(all_layer_embed_list)
+        mean_all_embed_tensor = torch.mean(all_embed_tensor, dim=0)
+        user_embed, item_embed = torch.split(
+            mean_all_embed_tensor, [self._num_users, self._num_items]
+        )
+        return user_embed, item_embed

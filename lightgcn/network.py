@@ -18,15 +18,6 @@ def _take_power_1over2_if_non_zero(value: np.float32) -> np.float32:
 _take_power_1over2_if_non_zero_func = np.frompyfunc(_take_power_1over2_if_non_zero, 1, 1)
 
 
-class AdjNormTensor:
-    @staticmethod
-    def init(
-        num_users: int, num_items: int, user_id_idxs: np.ndarray, item_id_idxs: np.ndarray
-    ) -> torch.Tensor:
-        pass
-
-
-# This method creates D^{-1/2} A D^{-1/2} in the article https://arxiv.org/abs/2002.02126
 def init_adj_matrix(
     num_users: int, num_items: int, user_id_idxs: np.ndarray, item_id_idxs: np.ndarray
 ) -> torch.Tensor:
@@ -88,7 +79,7 @@ class LightGCN(nn.Module):
     def forward(self, user_idxs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         embed_weights = self._embed.weight
         all_layer_embed_list = [self._embed.weight]
-        # Create a list of an embedding [E^{(0)}, E^{(1)}, ..., E^{(K)}].
+        # Create a list of embeddings [E^{(0)}, E^{(1)}, ..., E^{(K)}].
         for _ in range(self._num_layers):
             embed_weights = torch.sparse.mm(self._norm_adj, embed_weights)
             all_layer_embed_list.append(embed_weights)

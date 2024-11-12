@@ -3,8 +3,10 @@ from typing import Self
 import numpy as np
 import pandas as pd
 import torch
+from torch.utils.data import DataLoader
 
 from lightgcn.columns import FeatureCol
+from lightgcn.dataset import RecommendUserDataset
 from lightgcn.embedding import InitDist
 from lightgcn.network import LightGCNNetwork
 
@@ -38,11 +40,15 @@ class LightGCN:
             self._num_users, self._num_items, self._vec_dim, self._init_dict
         )
         optimizer = torch.optim.Adam(self._network.parameters(), lr=self._lr)
+
         self._network.train()
+        unique_user_id_idxs = user_idx_items_df[FeatureCol.USER_ID_IDX].values
+        dataset = RecommendUserDataset(unique_user_id_idxs)
+        dataloader = DataLoader(dataset, batch_size=self._batch_size, shuffle=True)
 
         for epoch in range(self._epochs):
-            pass
-        pass
+            for user_id_idx in dataloader:
+                self._network()
 
         return self
 
@@ -59,3 +65,9 @@ class LightGCN:
             )
         ).rename(columns={FeatureCol.ITEM_ID_IDX: self._ITEM_ID_IDX_LIST_COL})
         return item_grouped_df
+
+    def _extract_pos_neg_item_idxs(
+        self, user_id_idx: int, grouped_by_user_df: pd.DataFrame
+    ) -> dict[str, np.ndarray]:
+        grouped_by_user_df[grouped_by_user_df[FeatureCol.USER_ID_IDX] == user_id_idx]
+        return {}

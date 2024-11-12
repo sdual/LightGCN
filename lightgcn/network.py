@@ -54,7 +54,7 @@ def _to_space_tensor(adj_norm_mat: csr_matrix) -> torch.Tensor:
     return adj_norm_tensor
 
 
-class LightGCN(nn.Module):
+class LightGCNNetwork(nn.Module):
     def __init__(
         self,
         num_users: int,
@@ -64,9 +64,9 @@ class LightGCN(nn.Module):
         init_dist: InitDist,
         user_item_idxs: pd.DataFrame,
     ):
-        super(LightGCN, self).__init__()
+        super(LightGCNNetwork, self).__init__()
         embed_initializer = EmbeddingLayer(num_users, num_items, vec_dim, init_dist)
-        self._embed: nn.Embedding = embed_initializer.init_embedding()
+        self._init_embed: nn.Embedding = embed_initializer.init_embedding()
         self._num_users: int = num_users
         self._num_items: int = num_items
         user_id_idxs = user_item_idxs[FeatureCol.USER_ID_IDX].values
@@ -76,9 +76,19 @@ class LightGCN(nn.Module):
         )
         self._num_layers: int = num_layers
 
-    def forward(self, user_idxs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        embed_weights = self._embed.weight
-        all_layer_embed_list = [self._embed.weight]
+    def initial_layer_embeddings(
+        self, user_idxs: torch.Tensor, pos_item_idxs: torch.Tensor, neg_item_idxs: torch.Tensor
+    ) -> dict[str, torch.Tensor]:
+        init_user_emb, init_item_emb = torch.split(
+            self._init_embed, [self._num_users, self._num_items]
+        )
+        return {"user_0emb": init_user_emb, "item_0emb": init_item_emb}
+
+    def forward(
+        self, user_idxs: list[int], pos_item_idxs: list[int], neg_item_idxs: list[int]
+    ) -> dict[str, torch.Tensor]:
+        embed_weights = self._init_embed.weight
+        all_layer_embed_list = [embed_weights]
         # Create a list of embeddings [E^{(0)}, E^{(1)}, ..., E^{(K)}].
         for _ in range(self._num_layers):
             embed_weights = torch.sparse.mm(self._norm_adj, embed_weights)
@@ -87,7 +97,14 @@ class LightGCN(nn.Module):
         all_embed_tensor = torch.stack(all_layer_embed_list)
         # Average of all the embeddings E = α_0 E^{(0)} + α_1 E^{(1)} + ... + α_K E^{(K)}
         mean_all_embed_tensor = torch.mean(all_embed_tensor, dim=0)
-        user_embed, item_embed = torch.split(
+        all_user_embeds, all_item_embeds = torch.split(
             mean_all_embed_tensor, [self._num_users, self._num_items]
         )
-        return user_embed, item_embed
+        user_emb = all_user_embeds[user_idxs]
+        pos_item_emb = all_item_embeds[pos_item_idxs]
+        neg_item_emb = all_item_embeds[neg_item_idxs]
+        return {
+            "user_emb": user_emb,
+            "pos_item_emb": pos_item_emb,
+            "neg_item_emb": neg_item_emb,
+        }

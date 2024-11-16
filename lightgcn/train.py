@@ -1,4 +1,5 @@
-from typing import Self
+import random
+from typing import Any, Self
 
 import numpy as np
 import pandas as pd
@@ -13,6 +14,8 @@ from lightgcn.network import LightGCNNetwork
 
 class LightGCN:
     _ITEM_ID_IDX_LIST_COL: str = "item_id_idx_list"
+    _SAMPLED_POS_ITEM_IDX_COL: str = "sampled_pos_item_idx"
+    _SAMPLED_NEG_ITEM_IDX_COL: str = "sampled_neg_item_idx"
 
     def __init__(
         self,
@@ -39,6 +42,7 @@ class LightGCN:
         self._network = LightGCNNetwork(
             self._num_users, self._num_items, self._vec_dim, self._init_dict
         )
+        unique_item_idxs = rating_df[FeatureCol.ITEM_ID_IDX].unique()
         optimizer = torch.optim.Adam(self._network.parameters(), lr=self._lr)
 
         self._network.train()
@@ -67,7 +71,24 @@ class LightGCN:
         return item_grouped_df
 
     def _extract_pos_neg_item_idxs(
-        self, user_id_idx: int, grouped_by_user_df: pd.DataFrame
+        self,
+        user_id_idxs: list[int],
+        unique_item_idxs: np.ndarray,
+        grouped_by_user_df: pd.DataFrame,
     ) -> dict[str, np.ndarray]:
-        grouped_by_user_df[grouped_by_user_df[FeatureCol.USER_ID_IDX] == user_id_idx]
-        return {}
+        sampled_pos_item_idx = grouped_by_user_df[
+            grouped_by_user_df[FeatureCol.USER_ID_IDX].isin(user_id_idxs)
+        ][self._ITEM_ID_IDX_LIST_COL].apply(lambda item_idxs: random.choice(item_idxs))
+
+        grouped_by_user_df[self._SAMPLED_POS_ITEM_IDX_COL] = sampled_pos_item_idx
+
+        sampled_neg_item_idx = grouped_by_user_df[
+            grouped_by_user_df[FeatureCol.USER_ID_IDX].isin(user_id_idxs)
+        ][self._ITEM_ID_IDX_LIST_COL].apply(
+            lambda x: random.choice(list(set(unique_item_idxs) - set(x)))
+        )
+        grouped_by_user_df[self._SAMPLED_NEG_ITEM_IDX_COL] = sampled_neg_item_idx
+
+        return grouped_by_user_df[
+            [FeatureCol.USER_ID_IDX, self._SAMPLED_POS_ITEM_IDX_COL, self._SAMPLED_NEG_ITEM_IDX_COL]
+        ]

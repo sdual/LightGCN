@@ -62,27 +62,19 @@ class LightGCNNetwork(nn.Module):
         vec_dim: int,
         num_layers: int,
         init_dist: InitDist,
-        user_item_idxs: pd.DataFrame,
+        pos_interact_user_item_idxs: pd.DataFrame,
     ):
         super(LightGCNNetwork, self).__init__()
         embed_initializer = EmbeddingLayer(num_users, num_items, vec_dim, init_dist)
         self._init_embed: nn.Embedding = embed_initializer.init_embedding()
         self._num_users: int = num_users
         self._num_items: int = num_items
-        user_id_idxs = user_item_idxs[FeatureCol.USER_ID_IDX].values
-        item_id_idxs = user_item_idxs[FeatureCol.ITEM_ID_IDX].values
+        user_id_idxs = pos_interact_user_item_idxs[FeatureCol.USER_ID_IDX].values
+        item_id_idxs = pos_interact_user_item_idxs[FeatureCol.ITEM_ID_IDX].values
         self._norm_adj: torch.Tensor = init_adj_matrix(
             num_users, num_items, user_id_idxs, item_id_idxs
         )
         self._num_layers: int = num_layers
-
-    def initial_layer_embeddings(
-        self, user_idxs: torch.Tensor, pos_item_idxs: torch.Tensor, neg_item_idxs: torch.Tensor
-    ) -> dict[str, torch.Tensor]:
-        init_user_emb, init_item_emb = torch.split(
-            self._init_embed, [self._num_users, self._num_items]
-        )
-        return {"user_0emb": init_user_emb, "item_0emb": init_item_emb}
 
     def forward(
         self, user_idxs: list[int], pos_item_idxs: list[int], neg_item_idxs: list[int]
@@ -103,8 +95,19 @@ class LightGCNNetwork(nn.Module):
         user_emb = all_user_embeds[user_idxs]
         pos_item_emb = all_item_embeds[pos_item_idxs]
         neg_item_emb = all_item_embeds[neg_item_idxs]
+
+        all_init_user_emb, init_item_emb = torch.split(
+            self._init_embed.weight, [self._num_users, self._num_items]
+        )
+        init_user_0emb = all_init_user_emb[user_idxs]
+        init_pos_item_0emb = all_init_user_emb[pos_item_idxs]
+        init_neg_item_0emb = all_init_user_emb[neg_item_idxs]
+
         return {
             "user_emb": user_emb,
             "pos_item_emb": pos_item_emb,
             "neg_item_emb": neg_item_emb,
+            "user_0emb": init_user_0emb,
+            "pos_item_0emb": init_pos_item_0emb,
+            "neg_item_0emb": init_neg_item_0emb,
         }

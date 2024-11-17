@@ -1,5 +1,5 @@
 import random
-from typing import Any, Self
+from typing import Self
 
 import numpy as np
 import pandas as pd
@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader
 from lightgcn.columns import FeatureCol
 from lightgcn.dataset import RecommendUserDataset
 from lightgcn.embedding import InitDist
+from lightgcn.loss import bpr_loss
 from lightgcn.network import LightGCNNetwork
 
 
@@ -21,22 +22,20 @@ class _TempCol:
 class _PosNegItemSelector:
     @staticmethod
     def select_pos_neg_item_idxs(
-        user_id_idxs: list[int],
+        user_id_idxs: torch.Tensor,
         unique_item_idxs: np.ndarray,
         grouped_by_user_df: pd.DataFrame,
     ):
+        user_id_idxs_array = user_id_idxs.to("cpu").detach().numpy()
         sampled_pos_item_idx = grouped_by_user_df[
-            grouped_by_user_df[FeatureCol.USER_ID_IDX].isin(user_id_idxs)
+            grouped_by_user_df[FeatureCol.USER_ID_IDX].isin(user_id_idxs_array)
         ][_TempCol.ITEM_ID_IDX_LIST_COL].apply(lambda item_idxs: random.choice(item_idxs))
 
-        grouped_by_user_df[_TempCol.SAMPLED_POS_ITEM_IDX_COL] = sampled_pos_item_idx
-
         sampled_neg_item_idx = grouped_by_user_df[
-            grouped_by_user_df[FeatureCol.USER_ID_IDX].isin(user_id_idxs)
+            grouped_by_user_df[FeatureCol.USER_ID_IDX].isin(user_id_idxs_array)
         ][_TempCol.ITEM_ID_IDX_LIST_COL].apply(
             lambda x: random.choice(list(set(unique_item_idxs) - set(x)))
         )
-        grouped_by_user_df[_TempCol.SAMPLED_NEG_ITEM_IDX_COL] = sampled_neg_item_idx
 
         return pd.DataFrame(
             {
@@ -56,26 +55,35 @@ class LightGCN:
         self,
         batch_size: int,
         epochs: int,
+        num_layers: int,
         num_users: int,
         num_items: int,
         vec_dim: int,
         init_dict: InitDist,
         lr: float,
+        reg_param: float,
     ):
         self._batch_size: int = batch_size
         self._epochs: int = epochs
+        self._num_layers: int = num_layers
         self._num_users: int = num_users
         self._num_items: int = num_items
         self._vec_dim: int = vec_dim
         self._init_dict: InitDist = init_dict
         self._network: LightGCNNetwork | None = None
         self._lr: float = lr
+        self._reg_param: float = reg_param
 
     # ratings contains user_id_idx, item_id_idx and its ratings.
     def fit(self, rating_df: pd.DataFrame) -> Self:
         user_idx_items_df = self._groupby_user_id_idx(rating_df)
         self._network = LightGCNNetwork(
-            self._num_users, self._num_items, self._vec_dim, self._init_dict
+            self._num_users,
+            self._num_items,
+            self._vec_dim,
+            self._num_layers,
+            self._init_dict,
+            rating_df[[FeatureCol.USER_ID_IDX, FeatureCol.ITEM_ID_IDX]],
         )
         unique_item_idxs = rating_df[FeatureCol.ITEM_ID_IDX].unique()
         optimizer = torch.optim.Adam(self._network.parameters(), lr=self._lr)
@@ -87,7 +95,34 @@ class LightGCN:
 
         for epoch in range(self._epochs):
             for user_id_idx in dataloader:
-                self._network()
+                user_sampled_item_idxs = _PosNegItemSelector.select_pos_neg_item_idxs(
+                    user_id_idx, unique_item_idxs, user_idx_items_df
+                )
+                user_idx_tensor = torch.from_numpy(
+                    user_sampled_item_idxs[FeatureCol.USER_ID_IDX].values.astype(np.long)
+                )
+                pos_item_idx_tensor = torch.from_numpy(
+                    user_sampled_item_idxs[_TempCol.SAMPLED_POS_ITEM_IDX_COL].values.astype(np.long)
+                )
+                neg_item_idx_tensor = torch.from_numpy(
+                    user_sampled_item_idxs[_TempCol.SAMPLED_NEG_ITEM_IDX_COL].values.astype(np.long)
+                )
+
+                embeddings = self._network(
+                    user_idx_tensor, pos_item_idx_tensor, neg_item_idx_tensor
+                )
+                loss = bpr_loss(
+                    embeddings["user_emb"],
+                    embeddings["pos_item_emb"],
+                    embeddings["neg_item_emb"],
+                    embeddings["user_0emb"],
+                    embeddings["pos_item_0emb"],
+                    embeddings["neg_item_0emb"],
+                    self._reg_param,
+                )
+
+                loss.backward()
+                optimizer.step()
 
         return self
 
@@ -104,26 +139,3 @@ class LightGCN:
             )
         ).rename(columns={FeatureCol.ITEM_ID_IDX: self._ITEM_ID_IDX_LIST_COL})
         return item_grouped_df
-
-    def _extract_pos_neg_item_idxs(
-        self,
-        user_id_idxs: list[int],
-        unique_item_idxs: np.ndarray,
-        grouped_by_user_df: pd.DataFrame,
-    ) -> dict[str, np.ndarray]:
-        sampled_pos_item_idx = grouped_by_user_df[
-            grouped_by_user_df[FeatureCol.USER_ID_IDX].isin(user_id_idxs)
-        ][self._ITEM_ID_IDX_LIST_COL].apply(lambda item_idxs: random.choice(item_idxs))
-
-        grouped_by_user_df[self._SAMPLED_POS_ITEM_IDX_COL] = sampled_pos_item_idx
-
-        sampled_neg_item_idx = grouped_by_user_df[
-            grouped_by_user_df[FeatureCol.USER_ID_IDX].isin(user_id_idxs)
-        ][self._ITEM_ID_IDX_LIST_COL].apply(
-            lambda x: random.choice(list(set(unique_item_idxs) - set(x)))
-        )
-        grouped_by_user_df[self._SAMPLED_NEG_ITEM_IDX_COL] = sampled_neg_item_idx
-
-        return grouped_by_user_df[
-            [FeatureCol.USER_ID_IDX, self._SAMPLED_POS_ITEM_IDX_COL, self._SAMPLED_NEG_ITEM_IDX_COL]
-        ]

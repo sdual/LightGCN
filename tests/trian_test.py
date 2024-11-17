@@ -57,35 +57,52 @@ class TestPosNegItemSelector:
 class TestLightGCN:
     def test_fit(self):
         torch.manual_seed(42)
-
-        batch_size: int = 10
-        epochs: int = 4
-        num_users: int = 3
-        num_items: int = 5
-        vec_dim: int = 3
-        lr: float = 0.01
-
-        model = LightGCN(
-            batch_size, epochs, num_users, num_items, vec_dim, InitDist.XAVIER_UNIFORM, lr
-        )
-
-        train_df, test_df = create_movielens_dataset(head=10)
-        cols = ["user_id_idx", "item_id_idx", "rating"]
-        print(train_df[cols])
-
-    def test_extract_pos_neg_item_idxs():
-        # Fix the seed for test to use the same items in _extract_pos_neg_item_idxs method.
         random.seed(42)
 
+        train_df, test_df = create_movielens_dataset(head=10)
+
         batch_size: int = 10
         epochs: int = 4
-        num_users: int = 3
-        num_items: int = 5
+        num_layers: int = 2
+        num_users: int = len(train_df["user_id_idx"].unique())
+        num_items: int = len(train_df["item_id_idx"].unique())
         vec_dim: int = 3
         lr: float = 0.01
+        reg_param = 0.5
 
         model = LightGCN(
-            batch_size, epochs, num_users, num_items, vec_dim, InitDist.XAVIER_UNIFORM, lr
+            batch_size,
+            epochs,
+            num_layers,
+            num_users,
+            num_items,
+            vec_dim,
+            InitDist.XAVIER_UNIFORM,
+            lr,
+            reg_param,
         )
 
-        model._extract_pos_neg_item_idxs()
+        model = model.fit(train_df)
+        actual = model._network._init_embed.weight
+        expected = torch.Tensor(
+            [
+                [0.24587622, -0.30305746, -0.5168112],
+                [-0.17767076, -0.39160785, 0.42170766],
+                [0.12335217, 0.19445957, 0.13921043],
+                [-0.01340425, 0.40201655, -0.3612666],
+                [-0.00430678, -0.34485203, 0.13466291],
+                [-0.15396093, 0.13267091, -0.07757735],
+                [0.42781708, -0.29469374, -0.29687238],
+                [-0.29677236, 0.4670942, 0.14890906],
+                [0.50144184, -0.44473982, -0.52636],
+                [-0.4004701, -0.36767477, 0.21333274],
+                [0.19897717, 0.503499, -0.32988557],
+                [-0.34332564, 0.3243893, -0.19168992],
+                [0.30788788, -0.17277794, 0.3578891],
+                [-0.47448456, -0.27350226, 0.19481541],
+                [0.08272194, -0.10851637, 0.3716828],
+                [0.4201203, -0.44673657, -0.33932137],
+            ]
+        )
+
+        torch.testing.assert_close(actual, expected)

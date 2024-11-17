@@ -88,11 +88,11 @@ class LightGCN:
         unique_item_idxs = rating_df[FeatureCol.ITEM_ID_IDX].unique()
         optimizer = torch.optim.Adam(self._network.parameters(), lr=self._lr)
 
-        self._network.train()
         unique_user_id_idxs = user_idx_items_df[FeatureCol.USER_ID_IDX].values
         dataset = RecommendUserDataset(unique_user_id_idxs)
         dataloader = DataLoader(dataset, batch_size=self._batch_size, shuffle=True)
 
+        self._network.train()
         for epoch in range(self._epochs):
             for user_id_idx in dataloader:
                 user_sampled_item_idxs = _PosNegItemSelector.select_pos_neg_item_idxs(

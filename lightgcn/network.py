@@ -18,15 +18,6 @@ def _take_power_1over2_if_non_zero(value: np.float32) -> np.float32:
 _take_power_1over2_if_non_zero_func = np.frompyfunc(_take_power_1over2_if_non_zero, 1, 1)
 
 
-class AdjNormTensor:
-    @staticmethod
-    def init(
-        num_users: int, num_items: int, user_id_idxs: np.ndarray, item_id_idxs: np.ndarray
-    ) -> torch.Tensor:
-        pass
-
-
-# This method creates D^{-1/2} A D^{-1/2} in the article https://arxiv.org/abs/2002.02126
 def init_adj_matrix(
     num_users: int, num_items: int, user_id_idxs: np.ndarray, item_id_idxs: np.ndarray
 ) -> torch.Tensor:
@@ -63,7 +54,7 @@ def _to_space_tensor(adj_norm_mat: csr_matrix) -> torch.Tensor:
     return adj_norm_tensor
 
 
-class LightGCN(nn.Module):
+class LightGCNNetwork(nn.Module):
     def __init__(
         self,
         num_users: int,
@@ -71,24 +62,26 @@ class LightGCN(nn.Module):
         vec_dim: int,
         num_layers: int,
         init_dist: InitDist,
-        user_item_idxs: pd.DataFrame,
+        pos_interact_user_item_idxs: pd.DataFrame,
     ):
-        super(LightGCN, self).__init__()
+        super(LightGCNNetwork, self).__init__()
         embed_initializer = EmbeddingLayer(num_users, num_items, vec_dim, init_dist)
-        self._embed: nn.Embedding = embed_initializer.init_embedding()
+        self._init_embed: nn.Embedding = embed_initializer.init_embedding()
         self._num_users: int = num_users
         self._num_items: int = num_items
-        user_id_idxs = user_item_idxs[FeatureCol.USER_ID_IDX].values
-        item_id_idxs = user_item_idxs[FeatureCol.ITEM_ID_IDX].values
+        user_id_idxs = pos_interact_user_item_idxs[FeatureCol.USER_ID_IDX].values
+        item_id_idxs = pos_interact_user_item_idxs[FeatureCol.ITEM_ID_IDX].values
         self._norm_adj: torch.Tensor = init_adj_matrix(
             num_users, num_items, user_id_idxs, item_id_idxs
         )
         self._num_layers: int = num_layers
 
-    def forward(self, user_idxs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        embed_weights = self._embed.weight
-        all_layer_embed_list = [self._embed.weight]
-        # Create a list of an embedding [E^{(0)}, E^{(1)}, ..., E^{(K)}].
+    def forward(
+        self, user_idxs: list[int], pos_item_idxs: list[int], neg_item_idxs: list[int]
+    ) -> dict[str, torch.Tensor]:
+        embed_weights = self._init_embed.weight
+        all_layer_embed_list = [embed_weights]
+        # Create a list of embeddings [E^{(0)}, E^{(1)}, ..., E^{(K)}].
         for _ in range(self._num_layers):
             embed_weights = torch.sparse.mm(self._norm_adj, embed_weights)
             all_layer_embed_list.append(embed_weights)
@@ -96,7 +89,25 @@ class LightGCN(nn.Module):
         all_embed_tensor = torch.stack(all_layer_embed_list)
         # Average of all the embeddings E = α_0 E^{(0)} + α_1 E^{(1)} + ... + α_K E^{(K)}
         mean_all_embed_tensor = torch.mean(all_embed_tensor, dim=0)
-        user_embed, item_embed = torch.split(
+        all_user_embeds, all_item_embeds = torch.split(
             mean_all_embed_tensor, [self._num_users, self._num_items]
         )
-        return user_embed, item_embed
+        user_emb = all_user_embeds[user_idxs]
+        pos_item_emb = all_item_embeds[pos_item_idxs]
+        neg_item_emb = all_item_embeds[neg_item_idxs]
+
+        all_init_user_emb, init_item_emb = torch.split(
+            self._init_embed.weight, [self._num_users, self._num_items]
+        )
+        init_user_0emb = all_init_user_emb[user_idxs]
+        init_pos_item_0emb = all_init_user_emb[pos_item_idxs]
+        init_neg_item_0emb = all_init_user_emb[neg_item_idxs]
+
+        return {
+            "user_emb": user_emb,
+            "pos_item_emb": pos_item_emb,
+            "neg_item_emb": neg_item_emb,
+            "user_0emb": init_user_0emb,
+            "pos_item_0emb": init_pos_item_0emb,
+            "neg_item_0emb": init_neg_item_0emb,
+        }

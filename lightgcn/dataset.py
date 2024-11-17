@@ -11,5 +11,6 @@ class RecommendUserDataset(Dataset):
         return len(self._unique_user_id_idxs)
 
     def __getitem__(self, index):
-        user_id = self._unique_user_id_idxs[index]
-        return torch.tensor(user_id).float()
+        user_id_idx = self._unique_user_id_idxs[index]
+        # the data type of user_id is integer.
+        return torch.tensor(user_id_idx).long()

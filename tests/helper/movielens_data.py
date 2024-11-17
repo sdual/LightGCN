@@ -8,7 +8,7 @@ from lightgcn import PROJECT_ROOT
 from lightgcn.columns import FeatureCol
 
 
-def create_movielens_dataset() -> tuple[pd.DataFrame, pd.DataFrame]:
+def create_movielens_dataset(head: int | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
     file_path = os.path.join(PROJECT_ROOT, "testdata/ml-100k/u.data")
     movielens_df = pd.read_csv(
         file_path,
@@ -22,6 +22,8 @@ def create_movielens_dataset() -> tuple[pd.DataFrame, pd.DataFrame]:
     )
 
     movielens_df = movielens_df[movielens_df[FeatureCol.RATING] >= 3]
+    if head is not None:
+        movielens_df = movielens_df[:head]
 
     train_df, test_df = train_test_split(movielens_df.values, test_size=0.2, random_state=42)
     train_df = pd.DataFrame(train_df, columns=movielens_df.columns)

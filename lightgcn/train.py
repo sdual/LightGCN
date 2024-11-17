@@ -12,6 +12,41 @@ from lightgcn.embedding import InitDist
 from lightgcn.network import LightGCNNetwork
 
 
+class _TempCol:
+    ITEM_ID_IDX_LIST_COL: str = "item_id_idx_list"
+    SAMPLED_POS_ITEM_IDX_COL: str = "sampled_pos_item_idx"
+    SAMPLED_NEG_ITEM_IDX_COL: str = "sampled_neg_item_idx"
+
+
+class _PosNegItemSelector:
+    @staticmethod
+    def select_pos_neg_item_idxs(
+        user_id_idxs: list[int],
+        unique_item_idxs: np.ndarray,
+        grouped_by_user_df: pd.DataFrame,
+    ):
+        sampled_pos_item_idx = grouped_by_user_df[
+            grouped_by_user_df[FeatureCol.USER_ID_IDX].isin(user_id_idxs)
+        ][_TempCol.ITEM_ID_IDX_LIST_COL].apply(lambda item_idxs: random.choice(item_idxs))
+
+        grouped_by_user_df[_TempCol.SAMPLED_POS_ITEM_IDX_COL] = sampled_pos_item_idx
+
+        sampled_neg_item_idx = grouped_by_user_df[
+            grouped_by_user_df[FeatureCol.USER_ID_IDX].isin(user_id_idxs)
+        ][_TempCol.ITEM_ID_IDX_LIST_COL].apply(
+            lambda x: random.choice(list(set(unique_item_idxs) - set(x)))
+        )
+        grouped_by_user_df[_TempCol.SAMPLED_NEG_ITEM_IDX_COL] = sampled_neg_item_idx
+
+        return pd.DataFrame(
+            {
+                FeatureCol.USER_ID_IDX: user_id_idxs,
+                _TempCol.SAMPLED_POS_ITEM_IDX_COL: sampled_pos_item_idx,
+                _TempCol.SAMPLED_NEG_ITEM_IDX_COL: sampled_neg_item_idx,
+            }
+        ).reset_index(drop=True)
+
+
 class LightGCN:
     _ITEM_ID_IDX_LIST_COL: str = "item_id_idx_list"
     _SAMPLED_POS_ITEM_IDX_COL: str = "sampled_pos_item_idx"

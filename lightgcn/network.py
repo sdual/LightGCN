@@ -96,12 +96,12 @@ class LightGCNNetwork(nn.Module):
         pos_item_emb = all_item_embeds[pos_item_idxs]
         neg_item_emb = all_item_embeds[neg_item_idxs]
 
-        all_init_user_emb, init_item_emb = torch.split(
+        all_init_user_emb, all_init_item_emb = torch.split(
             self._init_embed.weight, [self._num_users, self._num_items]
         )
         init_user_0emb = all_init_user_emb[user_idxs]
-        init_pos_item_0emb = all_init_user_emb[pos_item_idxs]
-        init_neg_item_0emb = all_init_user_emb[neg_item_idxs]
+        init_pos_item_0emb = all_init_item_emb[pos_item_idxs]
+        init_neg_item_0emb = all_init_item_emb[neg_item_idxs]
 
         return {
             "user_emb": user_emb,

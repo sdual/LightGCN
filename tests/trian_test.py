@@ -106,3 +106,32 @@ class TestLightGCN:
         )
 
         torch.testing.assert_close(actual, expected)
+
+    def test_train_all_data(self):
+        torch.manual_seed(42)
+        random.seed(42)
+
+        train_df, test_df = create_movielens_dataset()
+
+        batch_size: int = 1024
+        epochs: int = 30
+        num_layers: int = 3
+        num_users: int = len(train_df["user_id_idx"].unique())
+        num_items: int = len(train_df["item_id_idx"].unique())
+        vec_dim: int = 64
+        lr: float = 0.005
+        reg_param = 0.0001
+
+        model = LightGCN(
+            batch_size,
+            epochs,
+            num_layers,
+            num_users,
+            num_items,
+            vec_dim,
+            InitDist.XAVIER_UNIFORM,
+            lr,
+            reg_param,
+        )
+
+        model = model.fit(train_df)

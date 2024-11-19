@@ -1,5 +1,6 @@
 import random
 
+import matplotlib.pyplot as plt
 import pandas as pd
 import torch
 
@@ -135,3 +136,9 @@ class TestLightGCN:
         )
 
         model = model.fit(train_df)
+        train_loss_history = model.loss_history()
+        plt.plot(train_loss_history, label="training loss")
+        plt.xlabel("iteration")
+        plt.ylabel("loss")
+        plt.legend()
+        plt.savefig("train-loss.png", format="png", dpi=200)

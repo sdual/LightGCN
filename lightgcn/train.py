@@ -89,7 +89,7 @@ class LightGCN:
         self._train_loss_history: list[float] = []
         self._val_loss_history: list[float] = []
         self._val_user_id_idxs: torch.Tensor | None = None
-        self._val_unique_item_ids: np.ndarray | None = None
+        self._val_unique_item_idxs: np.ndarray | None = None
 
     # ratings contains user_id_idx, item_id_idx and its ratings.
     def fit(self, rating_df: pd.DataFrame, val_rating_df: pd.DataFrame | None = None) -> Self:
@@ -159,11 +159,32 @@ class LightGCN:
         self._network.eval()
 
     def _calc_val_loss(self, val_rating_df: pd.DataFrame):
-        user_id_idxs = torch.from_numpy(
-            val_rating_df[FeatureCol.USER_ID_IDX].values.astype(np.long)
+        if self._val_user_id_idxs is None:
+            self._val_user_id_idxs = torch.from_numpy(
+                val_rating_df[FeatureCol.USER_ID_IDX].values.astype(np.long)
+            )
+
+        if self._val_unique_item_idxs is None:
+            self._val_unique_item_idxs = np.unique(val_rating_df[FeatureCol.ITEM_ID_IDX].values)
+        neg_item_idx_tensor = self._extract_neg_items(
+            self._val_user_id_idxs, self._val_unique_item_idxs, val_rating_df
         )
-        unique_item_ids
-        self._extract_neg_items()
+        pos_item_id_idx = torch.from_numpy(
+            val_rating_df[FeatureCol.ITEM_ID_IDX].values.astype(np.long)
+        )
+
+        self._network.eval()
+        embeddings = self._network(self._val_user_id_idxs, pos_item_id_idx, neg_item_idx_tensor)
+        loss = bpr_loss(
+            embeddings["user_emb"],
+            embeddings["pos_item_emb"],
+            embeddings["neg_item_emb"],
+            embeddings["user_0emb"],
+            embeddings["pos_item_0emb"],
+            embeddings["neg_item_0emb"],
+            self._reg_param,
+        )
+        self._val_loss_history.append(loss)
 
     def _groupby_user_id_idx(self, rating_df: pd.DataFrame) -> pd.DataFrame:
         item_grouped_df = pd.DataFrame(

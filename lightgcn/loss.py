@@ -14,7 +14,7 @@ def bpr_loss(
         0.5
         * reg_param
         * (user_0embs.norm().pow(2) + pos_item_0embs.norm().pow(2) + neg_item_0embs.norm().pow(2))
-    ) / len(user_embs)
+    ) / float(len(user_embs))
     pos_inner_products = torch.mul(user_embs, pos_item_embs)
     neg_inner_products = torch.mul(user_embs, neg_item_embs)
 

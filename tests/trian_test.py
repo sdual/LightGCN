@@ -136,9 +136,12 @@ class TestLightGCN:
         )
 
         model = model.fit(train_df)
-        train_loss_history = model.loss_history()
+        train_loss_history = model.train_loss_history()
+        val_loss_history = model.val_loss_history()
         plt.plot(train_loss_history, label="training loss")
+        plt.plot(val_loss_history, label="validation loss")
         plt.xlabel("iteration")
         plt.ylabel("loss")
         plt.legend()
-        plt.savefig("train-loss.png", format="png", dpi=200)
+
+        plt.savefig("train-loss.png", format="png", dpi=100)

@@ -24,7 +24,6 @@ class _PosNegItemSelector:
     def select_pos_neg_item_idxs(
         cls,
         user_id_idxs: torch.Tensor,
-        pos_item_idxs: torch.Tensor,
         unique_item_idxs: np.ndarray,
         grouped_by_user_df: pd.DataFrame,
     ):
@@ -87,11 +86,13 @@ class LightGCN:
         self._network: LightGCNNetwork | None = None
         self._lr: float = lr
         self._reg_param: float = reg_param
-        self._loss_history: list[float] = []
+        self._train_loss_history: list[float] = []
+        self._val_loss_history: list[float] = []
+        self._val_user_id_idxs: torch.Tensor | None = None
+        self._val_unique_item_ids: np.ndarray | None = None
 
     # ratings contains user_id_idx, item_id_idx and its ratings.
-    def fit(self, rating_df: pd.DataFrame) -> Self:
-        user_idx_items_df = self._groupby_user_id_idx(rating_df)
+    def fit(self, rating_df: pd.DataFrame, val_rating_df: pd.DataFrame | None = None) -> Self:
         self._network = LightGCNNetwork(
             self._num_users,
             self._num_items,
@@ -108,21 +109,15 @@ class LightGCN:
 
         self._network.train()
         for epoch in range(self._epochs):
+            # TODO: Use logger.
             print(f"epoch: {epoch}")
-            for user_id_idx, pos_item_id_idx in dataloader:
+            for user_id_idxs, pos_item_id_idx in dataloader:
                 optimizer.zero_grad()
-                user_sampled_item_idxs = _PosNegItemSelector.select_pos_neg_item_idxs(
-                    user_id_idx, pos_item_id_idx, unique_item_idxs, user_idx_items_df
+                neg_item_idx_tensor = self._extract_neg_items(
+                    user_id_idxs, unique_item_idxs, rating_df
                 )
 
-                user_idx_tensor = torch.from_numpy(
-                    user_sampled_item_idxs[FeatureCol.USER_ID_IDX].values.astype(np.long)
-                )
-                neg_item_idx_tensor = torch.from_numpy(
-                    user_sampled_item_idxs[_TempCol.SAMPLED_NEG_ITEM_IDX_COL].values.astype(np.long)
-                )
-
-                embeddings = self._network(user_idx_tensor, pos_item_id_idx, neg_item_idx_tensor)
+                embeddings = self._network(user_id_idxs, pos_item_id_idx, neg_item_idx_tensor)
                 loss = bpr_loss(
                     embeddings["user_emb"],
                     embeddings["pos_item_emb"],
@@ -135,15 +130,40 @@ class LightGCN:
 
                 loss.backward()
                 optimizer.step()
-                self._loss_history.append(loss.item())
+                self._train_loss_history.append(loss.item())
+
+                # TODO: User logger.
                 print(f"train loss: {loss.item()}")
+            if val_rating_df is not None:
+                self._calc_val_loss(rating_df)
         return self
 
-    def predict(self) -> np.ndarray:
+    def _extract_neg_items(
+        self,
+        user_id_idx: torch.Tensor,
+        unique_item_idxs: np.ndarray,
+        rating_df: pd.DataFrame,
+    ) -> dict[str, torch.Tensor]:
+        user_idx_items_df = self._groupby_user_id_idx(rating_df)
+        user_sampled_item_idxs = _PosNegItemSelector.select_pos_neg_item_idxs(
+            user_id_idx, unique_item_idxs, user_idx_items_df
+        )
+        neg_item_idx_tensor = torch.from_numpy(
+            user_sampled_item_idxs[_TempCol.SAMPLED_NEG_ITEM_IDX_COL].values.astype(np.long)
+        )
+        return neg_item_idx_tensor
+
+    def predict(self, user_item_df: pd.DataFrame) -> np.ndarray:
         if self._network is None:
             raise RuntimeError("LightGCN is not trained")
         self._network.eval()
-        pass
+
+    def _calc_val_loss(self, val_rating_df: pd.DataFrame):
+        user_id_idxs = torch.from_numpy(
+            val_rating_df[FeatureCol.USER_ID_IDX].values.astype(np.long)
+        )
+        unique_item_ids
+        self._extract_neg_items()
 
     def _groupby_user_id_idx(self, rating_df: pd.DataFrame) -> pd.DataFrame:
         item_grouped_df = pd.DataFrame(
@@ -153,5 +173,8 @@ class LightGCN:
         ).rename(columns={FeatureCol.ITEM_ID_IDX: _TempCol.ITEM_ID_IDX_LIST_COL})
         return item_grouped_df
 
-    def loss_history(self) -> list[float]:
-        return self._loss_history
+    def train_loss_history(self) -> list[float]:
+        return self._train_loss_history
+
+    def val_loss_history(self) -> list[float]:
+        return self._val_loss_history

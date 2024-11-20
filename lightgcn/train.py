@@ -135,6 +135,7 @@ class LightGCN:
                 # TODO: User logger.
                 print(f"train loss: {loss.item()}")
             if val_rating_df is not None:
+                self._network.eval()
                 self._calc_val_loss(rating_df)
         return self
 
@@ -173,7 +174,6 @@ class LightGCN:
             val_rating_df[FeatureCol.ITEM_ID_IDX].values.astype(np.long)
         )
 
-        self._network.eval()
         embeddings = self._network(self._val_user_id_idxs, pos_item_id_idx, neg_item_idx_tensor)
         loss = bpr_loss(
             embeddings["user_emb"],

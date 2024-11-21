@@ -146,6 +146,96 @@ class TestLightGCNNetwork:
             ]
         )
 
+        expected_user_0emb = torch.Tensor(
+            [
+                [
+                    0.5245535,
+                    -0.3748576,
+                    -0.3771952,
+                    -0.37721798,
+                    0.56885755,
+                    0.21076651,
+                    0.60858077,
+                    -0.52195054,
+                    -0.62731755,
+                    -0.49481028,
+                ],
+                [
+                    -0.4254459,
+                    0.2561699,
+                    0.22646706,
+                    0.5255227,
+                    -0.32661608,
+                    -0.4311524,
+                    0.3355671,
+                    -0.25564137,
+                    0.38385233,
+                    -0.1500821,
+                ],
+            ]
+        )
+
+        expected_pos_item_0emb = torch.Tensor(
+            [
+                [
+                    0.57911545,
+                    -0.21341105,
+                    -0.22421585,
+                    -0.6119606,
+                    -0.36218846,
+                    0.15798971,
+                    -0.08347981,
+                    -0.4590906,
+                    0.01483531,
+                    -0.43201867,
+                ],
+                [
+                    -0.5365732,
+                    -0.34826964,
+                    -0.5535327,
+                    -0.4027085,
+                    0.63220817,
+                    0.11945501,
+                    0.19489731,
+                    -0.58988136,
+                    -0.4153802,
+                    -0.2105165,
+                ],
+            ]
+        )
+
+        expected_neg_item_0emb = torch.Tensor(
+            [
+                [
+                    0.3617936,
+                    -0.4913977,
+                    -0.31916854,
+                    0.19282079,
+                    0.13370587,
+                    -0.16125007,
+                    0.37698743,
+                    0.4299491,
+                    -0.4586399,
+                    -0.33764789,
+                ],
+                [
+                    0.57911545,
+                    -0.21341105,
+                    -0.22421585,
+                    -0.6119606,
+                    -0.36218846,
+                    0.15798971,
+                    -0.08347981,
+                    -0.4590906,
+                    0.01483531,
+                    -0.43201867,
+                ],
+            ]
+        )
+
         torch.testing.assert_close(actual["user_emb"], expected_user_emb)
         torch.testing.assert_close(actual["pos_item_emb"], expected_pos_item_emb)
         torch.testing.assert_close(actual["neg_item_emb"], expected_neg_item_emb)
+        torch.testing.assert_close(actual["user_0emb"], expected_user_0emb)
+        torch.testing.assert_close(actual["pos_item_0emb"], expected_pos_item_0emb)
+        torch.testing.assert_close(actual["neg_item_0emb"], expected_neg_item_0emb)

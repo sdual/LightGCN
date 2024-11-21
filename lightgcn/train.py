@@ -26,11 +26,13 @@ class _PosNegItemSelector:
         user_id_idxs: torch.Tensor,
         unique_item_idxs: np.ndarray,
         grouped_by_user_df: pd.DataFrame,
-    ):
+    ) -> pd.DataFrame:
         # TODO: Select cpu or gpu according to the environment.
         user_id_idxs_array = user_id_idxs.to("cpu").detach().numpy()
-        target_user_df = pd.DataFrame({FeatureCol.USER_ID_IDX: user_id_idxs_array}).reset_index(
-            drop=True
+        target_user_df = (
+            pd.DataFrame({FeatureCol.USER_ID_IDX: user_id_idxs_array})
+            .reset_index(drop=True)
+            .astype(np.int64)
         )
 
         target_user_df[_TempCol.SAMPLED_NEG_ITEM_IDX_COL] = cls._extract_neg_item_idxs(
@@ -44,7 +46,7 @@ class _PosNegItemSelector:
         target_user_df: pd.DataFrame,
         unique_item_idxs: np.ndarray,
         grouped_by_user_df: pd.DataFrame,
-    ) -> pd.DataFrame:
+    ) -> pd.Series:
         return target_user_df.apply(
             lambda x: random.choice(
                 list(
@@ -53,7 +55,7 @@ class _PosNegItemSelector:
                 )
             ),
             axis=1,
-        )
+        ).astype(np.int64)
 
     @classmethod
     def _extract_item_idxs(cls, user_id_idx: int, grouped_by_user_df: pd.DataFrame) -> list[int]:

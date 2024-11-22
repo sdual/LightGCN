@@ -10,3 +10,5 @@ notebook/
 testdata/
 
 .DS_Store
+
+train-loss.png

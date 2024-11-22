@@ -1,9 +1,11 @@
+import os
 import random
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import torch
 
+from lightgcn import PROJECT_ROOT
 from lightgcn.embedding import InitDist
 from lightgcn.train import LightGCN, _PosNegItemSelector
 from tests.helper import create_movielens_dataset
@@ -110,7 +112,8 @@ class TestLightGCN:
         torch.manual_seed(42)
         random.seed(42)
 
-        train_df, test_df = create_movielens_dataset()
+        file_path = os.path.join(PROJECT_ROOT, "tests/helper/sample_data.tsv")
+        train_df, test_df = create_movielens_dataset(file_path=file_path)
 
         batch_size: int = 1024
         epochs: int = 30

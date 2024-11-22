@@ -8,8 +8,11 @@ from lightgcn import PROJECT_ROOT
 from lightgcn.columns import FeatureCol
 
 
-def create_movielens_dataset(head: int | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
-    file_path = os.path.join(PROJECT_ROOT, "testdata/ml-100k/u.data")
+def create_movielens_dataset(
+    head: int | None = None, file_path: str | None = None
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    if file_path is None:
+        file_path = os.path.join(PROJECT_ROOT, "testdata/ml-100k/u.data")
     movielens_df = pd.read_csv(
         file_path,
         sep="\t",
